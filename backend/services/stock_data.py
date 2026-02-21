@@ -86,16 +86,44 @@ class StockDataService:
         query_lower = query.lower()
         results = []
         
-        for symbol, name in {**StockDataService.POPULAR_STOCKS, **StockDataService.INDICES}.items():
-            if query_lower in symbol.lower() or query_lower in name.lower():
-                results.append({'symbol': symbol, 'name': name})
+        all_stocks = get_all_stocks()
+        for stock in all_stocks:
+            if query_lower in stock['symbol'].lower() or query_lower in stock['name'].lower():
+                results.append(stock)
         
         return results
     
     @staticmethod
     def get_popular_stocks() -> List[Dict[str, str]]:
         """Get list of popular Indian stocks"""
+        return NIFTY_50_STOCKS
+    
+    @staticmethod
+    def get_all_stocks() -> List[Dict[str, str]]:
+        """Get complete stock database"""
+        return get_all_stocks()
+    
+    @staticmethod
+    def get_stocks_by_index(index_name: str) -> List[Dict[str, str]]:
+        """Get stocks by index (Nifty 50, Nifty Bank, etc.)"""
+        return get_stocks_by_index(index_name)
+    
+    @staticmethod
+    def get_stocks_by_sector(sector: str) -> List[Dict[str, str]]:
+        """Get stocks by sector"""
+        return get_stocks_by_sector(sector)
+    
+    @staticmethod
+    def get_indices() -> List[Dict[str, str]]:
+        """Get list of Indian indices"""
         return [
             {'symbol': symbol, 'name': name}
-            for symbol, name in StockDataService.POPULAR_STOCKS.items()
+            for symbol, name in StockDataService.INDICES.items()
         ]
+    
+    @staticmethod
+    def get_all_sectors() -> List[str]:
+        """Get unique sectors"""
+        all_stocks = get_all_stocks()
+        sectors = list(set([s['sector'] for s in all_stocks]))
+        return sorted(sectors)
