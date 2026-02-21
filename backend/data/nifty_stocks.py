@@ -116,15 +116,15 @@ def generate_complete_stock_database():
 ALL_STOCKS_DB = generate_complete_stock_database()
 
 def get_all_stocks():
-    \"\"\"Get complete stock database - 750+ stocks\"\"\"
+    """Get complete stock database - 750+ stocks"""
     return ALL_STOCKS_DB
 
 def get_stocks_by_index(index_name):
-    \"\"\"Get stocks filtered by index\"\"\"
+    """Get stocks filtered by index"""
     return [s for s in ALL_STOCKS_DB if s['index'] == index_name]
 
 def get_stocks_by_sector(sector):
-    \"\"\"Get stocks filtered by sector\"\"\"
+    """Get stocks filtered by sector"""
     return [s for s in ALL_STOCKS_DB if s['sector'] == sector]
     {'symbol': 'RELIANCE.NS', 'name': 'Reliance Industries', 'sector': 'Oil & Gas', 'index': 'Nifty 50'},
     {'symbol': 'TCS.NS', 'name': 'Tata Consultancy Services', 'sector': 'IT', 'index': 'Nifty 50'},
