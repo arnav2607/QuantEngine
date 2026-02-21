@@ -93,7 +93,8 @@ const ChartsPage = () => {
         toast.dismiss();
 
         if (response.data && response.data.data && response.data.data.length > 0) {
-          const candleSeries = chart.addCandlestickSeries({
+          // Using v5 API: chart.addSeries(SeriesType, options)
+          const candleSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#10b981',
             downColor: '#ef4444',
             borderVisible: false,
