@@ -7,9 +7,10 @@ import Layout from '@/components/Layout';
 import Dashboard from '@/pages/Dashboard';
 import StrategyBuilder from '@/pages/StrategyBuilder';
 import SavedStrategies from '@/pages/SavedStrategies';
-import StockScreener from '@/pages/StockScreener';
+import EnhancedScreener from '@/pages/EnhancedScreener';
 import IndicatorsPage from '@/pages/IndicatorsPage';
 import BacktestResults from '@/pages/BacktestResults';
+import ChartsPage from '@/pages/ChartsPage';
 
 function App() {
   return (
@@ -20,9 +21,10 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/builder" element={<StrategyBuilder />} />
             <Route path="/strategies" element={<SavedStrategies />} />
-            <Route path="/screener" element={<StockScreener />} />
+            <Route path="/screener" element={<EnhancedScreener />} />
             <Route path="/indicators" element={<IndicatorsPage />} />
             <Route path="/results" element={<BacktestResults />} />
+            <Route path="/charts" element={<ChartsPage />} />
           </Routes>
         </Layout>
         <Toaster position="top-right" richColors />
