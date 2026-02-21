@@ -168,6 +168,34 @@ const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Strategy Templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Famous Strategy Templates</CardTitle>
+          <CardDescription>7 pre-built strategies ready to backtest</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stats.templates.map((template, idx) => (
+              <div key={idx} className="p-4 rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="font-semibold text-blue-500">{template.name}</div>
+                  <span className="px-2 py-1 bg-purple-500/10 text-purple-500 text-xs rounded-md">
+                    {template.category}
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">{template.description}</div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-mono">{template.timeframe}</span>
+                  <span>•</span>
+                  <span>{template.entry_rules.conditions.length} entry conditions</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
