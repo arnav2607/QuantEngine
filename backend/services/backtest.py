@@ -175,7 +175,16 @@ class BacktestEngine:
         equity = self.strategy.initial_capital
         peak_equity = equity
         
-        for i in range(1, len(self.df)):
+        # Safety limit to prevent infinite loops
+        max_iterations = len(self.df)
+        if max_iterations > 10000:
+            logger.warning(f"Large dataset: {max_iterations} bars, limiting to 10000")
+            max_iterations = min(max_iterations, 10000)
+        
+        for i in range(1, max_iterations):
+            if i >= len(self.df):
+                break
+                
             current_price = self.df.iloc[i]['Close']
             current_date = self.df.iloc[i]['Date']
             
