@@ -66,7 +66,7 @@ async def get_stocks_by_sector(sector: str):
 
 @api_router.get("/stocks/sectors")
 async def get_all_sectors():
-    \"\"\"Get list of all available sectors\"\"\"
+    """Get list of all available sectors"""
     return StockDataService.get_all_sectors()
 
 
