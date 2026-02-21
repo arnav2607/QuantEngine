@@ -42,8 +42,32 @@ async def root():
 
 @api_router.get("/stocks/popular")
 async def get_popular_stocks():
-    """Get list of popular Indian stocks"""
+    """Get list of popular Indian stocks (Nifty 50)"""
     return StockDataService.get_popular_stocks()
+
+
+@api_router.get("/stocks/all")
+async def get_all_stocks():
+    """Get complete stock database (100+ stocks)"""
+    return StockDataService.get_all_stocks()
+
+
+@api_router.get("/stocks/index/{index_name}")
+async def get_stocks_by_index(index_name: str):
+    """Get stocks filtered by index (Nifty 50, Nifty Bank, etc.)"""
+    return StockDataService.get_stocks_by_index(index_name)
+
+
+@api_router.get("/stocks/sector/{sector}")
+async def get_stocks_by_sector(sector: str):
+    """Get stocks filtered by sector"""
+    return StockDataService.get_stocks_by_sector(sector)
+
+
+@api_router.get("/stocks/sectors")
+async def get_all_sectors():
+    \"\"\"Get list of all available sectors\"\"\"
+    return StockDataService.get_all_sectors()
 
 
 @api_router.get("/stocks/indices")
