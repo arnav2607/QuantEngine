@@ -77,51 +77,60 @@ const ChartsPage = () => {
 
       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-      // Load data for each selected stock
-      for (let i = 0; i < selectedStocks.length; i++) {
-        const symbol = selectedStocks[i];
-        const color = colors[i % colors.length];
+      // Load only the first stock for now (simplify to fix the issue)
+      const symbol = selectedStocks[0];
+      
+      try {
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        try {
-          const endDate = new Date().toISOString().split('T')[0];
-          const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        toast.loading(`Loading ${symbol} data...`);
+        
+        const response = await axios.get(
+          `${API}/stocks/${symbol}/data?start_date=${startDate}&end_date=${endDate}&timeframe=${timeframe}`
+        );
 
-          const response = await axios.get(
-            `${API}/stocks/${symbol}/data?start_date=${startDate}&end_date=${endDate}&timeframe=${timeframe}`
-          );
+        toast.dismiss();
 
-          if (response.data && response.data.data && response.data.data.length > 0) {
-            const candlestickSeries = chart.addCandlestickSeries({
-              upColor: color,
-              downColor: '#ef4444',
-              borderVisible: false,
-              wickUpColor: color,
-              wickDownColor: '#ef4444',
-            });
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const candleSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+          });
 
-            const chartData = response.data.data.map(d => ({
-              time: new Date(d.Date).getTime() / 1000,
-              open: d.Open,
-              high: d.High,
-              low: d.Low,
-              close: d.Close,
-            }));
+          const chartData = response.data.data
+            .map(d => ({
+              time: Math.floor(new Date(d.Date).getTime() / 1000),
+              open: parseFloat(d.Open),
+              high: parseFloat(d.High),
+              low: parseFloat(d.Low),
+              close: parseFloat(d.Close),
+            }))
+            .filter(d => !isNaN(d.time) && !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close))
+            .sort((a, b) => a.time - b.time);
 
-            candlestickSeries.setData(chartData);
-            seriesRefs.current.push(candlestickSeries);
-            
-            console.log(`Loaded ${chartData.length} candles for ${symbol}`);
+          if (chartData.length > 0) {
+            candleSeries.setData(chartData);
+            chart.timeScale().fitContent();
+            toast.success(`Loaded ${chartData.length} candles for ${symbol}`);
+            console.log(`✓ Chart loaded: ${chartData.length} candles for ${symbol}`);
+          } else {
+            toast.error('No valid data points');
           }
-        } catch (error) {
-          console.error(`Error loading ${symbol}:`, error);
-          toast.error(`Failed to load ${symbol}`);
+        } else {
+          toast.error('No data available for selected period');
         }
+      } catch (error) {
+        toast.dismiss();
+        console.error(`Error loading ${symbol}:`, error);
+        toast.error(`Failed to load ${symbol}: ${error.message}`);
       }
-
-      chart.timeScale().fitContent();
     } catch (error) {
-      toast.error('Failed to load chart data');
-      console.error('Chart error:', error);
+      toast.error('Failed to initialize chart');
+      console.error('Chart initialization error:', error);
     }
   };
 
