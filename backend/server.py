@@ -7,6 +7,9 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime, timezone
+import sys
+
+sys.path.append('/app/backend')
 
 from models import (
     Strategy, StrategyCreate, BacktestResult, ScreenerRequest, 
@@ -15,6 +18,8 @@ from models import (
 from services.stock_data import StockDataService
 from services.indicators import IndicatorService
 from services.backtest import BacktestEngine
+from services.advanced_screener import AdvancedScreener
+from data.strategy_templates import get_all_templates, get_template_by_id
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
