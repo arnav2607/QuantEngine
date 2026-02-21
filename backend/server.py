@@ -295,7 +295,7 @@ async def run_screener(request: ScreenerRequest):
 
 @api_router.get("/screener/filters")
 async def get_screener_filters():
-    \"\"\"Get all available screener filter options\"\"\"
+    """Get all available screener filter options"""
     return {
         'price_action': [
             {'id': '52w_high', 'name': '52-Week High', 'description': 'Near 52-week high (within 2%)'},
