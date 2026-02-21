@@ -103,15 +103,19 @@ const ChartsPage = () => {
           });
 
           const chartData = response.data.data
-            .map(d => ({
-              time: Math.floor(new Date(d.Date).getTime() / 1000),
-              open: parseFloat(d.Open),
-              high: parseFloat(d.High),
-              low: parseFloat(d.Low),
-              close: parseFloat(d.Close),
-            }))
-            .filter(d => !isNaN(d.time) && !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close))
-            .sort((a, b) => a.time - b.time);
+            .map(d => {
+              // Extract date string in YYYY-MM-DD format for daily charts
+              const dateStr = d.Date.split('T')[0];
+              return {
+                time: dateStr,
+                open: parseFloat(d.Open),
+                high: parseFloat(d.High),
+                low: parseFloat(d.Low),
+                close: parseFloat(d.Close),
+              };
+            })
+            .filter(d => d.time && !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close))
+            .sort((a, b) => a.time.localeCompare(b.time));
 
           if (chartData.length > 0) {
             candleSeries.setData(chartData);
