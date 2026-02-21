@@ -66,10 +66,13 @@ const ChartsPage = () => {
         },
         timeScale: {
           borderColor: '#4b5563',
-          timeVisible: true,
+          timeVisible: false,
         },
         rightPriceScale: {
           borderColor: '#4b5563',
+        },
+        localization: {
+          locale: 'en-US',
         },
       });
 
