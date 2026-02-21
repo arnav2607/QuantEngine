@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import logging
 import sys
 sys.path.append('/app/backend')
-from data.nifty_stocks import get_all_stocks, get_stocks_by_index, get_stocks_by_sector, NIFTY_50_STOCKS, NIFTY_BANK_STOCKS
+from data.nifty_stocks import get_all_stocks, get_stocks_by_index, get_stocks_by_sector, NIFTY_50_STOCKS
 
 logger = logging.getLogger(__name__)
 
