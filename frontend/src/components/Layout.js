@@ -16,6 +16,7 @@ const Layout = ({ children }) => {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Strategy Builder', href: '/builder', icon: Activity },
     { name: 'Saved Strategies', href: '/strategies', icon: TrendingUp },
+    { name: 'Charts', href: '/charts', icon: BarChart3 },
     { name: 'Stock Screener', href: '/screener', icon: Search },
     { name: 'Indicators', href: '/indicators', icon: BookOpen },
   ];
