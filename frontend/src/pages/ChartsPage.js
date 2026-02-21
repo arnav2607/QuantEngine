@@ -46,8 +46,10 @@ const ChartsPage = () => {
         chartRef.current.remove();
       }
 
-      // Create new chart
-      const chart = createChart(chartContainerRef.current, {
+      // Create new chart with correct import
+      const { createChart: createLightweightChart } = await import('lightweight-charts');
+      
+      const chart = createLightweightChart(chartContainerRef.current, {
         width: chartContainerRef.current.clientWidth,
         height: 500,
         layout: {
@@ -78,13 +80,13 @@ const ChartsPage = () => {
 
         try {
           const endDate = new Date().toISOString().split('T')[0];
-          const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
           const response = await axios.get(
             `${API}/stocks/${symbol}/data?start_date=${startDate}&end_date=${endDate}&timeframe=${timeframe}`
           );
 
-          if (response.data && response.data.data) {
+          if (response.data && response.data.data && response.data.data.length > 0) {
             const candlestickSeries = chart.addCandlestickSeries({
               upColor: color,
               downColor: '#ef4444',
@@ -103,16 +105,19 @@ const ChartsPage = () => {
 
             candlestickSeries.setData(chartData);
             seriesRefs.current.push(candlestickSeries);
+            
+            console.log(`Loaded ${chartData.length} candles for ${symbol}`);
           }
         } catch (error) {
           console.error(`Error loading ${symbol}:`, error);
+          toast.error(`Failed to load ${symbol}`);
         }
       }
 
       chart.timeScale().fitContent();
     } catch (error) {
       toast.error('Failed to load chart data');
-      console.error(error);
+      console.error('Chart error:', error);
     }
   };
 
