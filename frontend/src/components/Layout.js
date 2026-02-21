@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { 
   LayoutDashboard, TrendingUp, Search, BookOpen, 
-  Settings, Sun, Moon, Menu, X, Activity 
+  Settings, Sun, Moon, Menu, X, Activity, BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
