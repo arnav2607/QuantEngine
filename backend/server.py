@@ -212,8 +212,9 @@ async def get_backtest_results(strategy_id: str):
 
 @api_router.post("/screener", response_model=List[ScreenerResult])
 async def run_screener(request: ScreenerRequest):
-    """Run stock screener with filters"""
+    """Run stock screener with advanced filters"""
     results = []
+    screener = AdvancedScreener()
     
     for symbol in request.universe:
         try:
@@ -226,7 +227,7 @@ async def run_screener(request: ScreenerRequest):
             
             df = StockDataService.fetch_stock_data(
                 symbol, 
-                request.date or "2024-01-01",
+                request.date or "2023-01-01",
                 request.date or datetime.now().strftime('%Y-%m-%d'),
                 "1d"
             )
@@ -235,29 +236,47 @@ async def run_screener(request: ScreenerRequest):
                 continue
             
             for filter_item in request.filters:
-                if filter_item.filter_type == "52w_high":
-                    high_52w = df['High'].tail(252).max()
-                    current_price = df['Close'].iloc[-1]
-                    if current_price >= high_52w * 0.98:
-                        matched_filters.append("52w_high")
-                        indicator_values['52w_high'] = high_52w
+                filter_type = filter_item.filter_type
+                params = filter_item.params or {}
+                matched = False
                 
-                elif filter_item.filter_type == "high_volume":
-                    vol_ma = df['Volume'].tail(20).mean()
-                    current_vol = df['Volume'].iloc[-1]
-                    if current_vol > vol_ma * 1.5:
-                        matched_filters.append("high_volume")
-                        indicator_values['volume_ratio'] = current_vol / vol_ma
+                # Price Action Filters
+                if filter_type in ['52w_high', 'ath', 'price_above_ma', 'price_near_low', 'new_high', 'gap_up', 'gap_down']:
+                    matched = screener.screen_price_action(df, filter_type, params)
                 
-                elif filter_item.filter_type == "strong_adx":
-                    ind_service = IndicatorService()
-                    adx_result = ind_service.calculate_adx(df)
-                    current_adx = adx_result['adx'].iloc[-1]
-                    if current_adx > 25:
-                        matched_filters.append("strong_adx")
-                        indicator_values['adx'] = current_adx
+                # Volume Filters
+                elif filter_type in ['high_volume', 'unusual_volume', 'volume_spike', 'increasing_volume']:
+                    matched = screener.screen_volume(df, filter_type, params)
+                
+                # Momentum Filters
+                elif filter_type in ['strong_adx', 'rsi_oversold', 'rsi_overbought', 'macd_bullish', 'macd_crossover', 'rsi_divergence']:
+                    matched = screener.screen_momentum(df, filter_type, params)
+                
+                # Volatility Filters
+                elif filter_type in ['high_volatility', 'bollinger_squeeze', 'bollinger_expansion']:
+                    matched = screener.screen_volatility(df, filter_type, params)
+                
+                # Pattern Filters
+                elif filter_type in ['bullish_engulfing', 'bearish_engulfing', 'doji', 'hammer']:
+                    matched = screener.screen_pattern(df, filter_type, params)
+                
+                # Performance Filters
+                elif filter_type in ['gainers_1d', 'losers_1d', 'gainers_1w', 'gainers_1m']:
+                    matched = screener.screen_performance(df, filter_type, params)
+                
+                if matched:
+                    matched_filters.append(filter_type)
             
             if matched_filters:
+                # Calculate some indicator values for display
+                current_price = df['Close'].iloc[-1]
+                prev_price = df['Close'].iloc[-2] if len(df) > 1 else current_price
+                change_percent = ((current_price - prev_price) / prev_price) * 100
+                
+                indicator_values['change_percent'] = round(change_percent, 2)
+                indicator_values['high_52w'] = round(df['High'].tail(252).max(), 2)
+                indicator_values['low_52w'] = round(df['Low'].tail(252).min(), 2)
+                
                 results.append(ScreenerResult(
                     symbol=symbol,
                     name=stock_info['name'],
@@ -272,6 +291,68 @@ async def run_screener(request: ScreenerRequest):
             continue
     
     return results
+
+
+@api_router.get("/screener/filters")
+async def get_screener_filters():
+    \"\"\"Get all available screener filter options\"\"\"
+    return {
+        'price_action': [
+            {'id': '52w_high', 'name': '52-Week High', 'description': 'Near 52-week high (within 2%)'},
+            {'id': 'ath', 'name': 'All-Time High', 'description': 'Near all-time high (within 1%)'},
+            {'id': 'price_above_ma', 'name': 'Price Above MA', 'description': 'Price above moving average', 'params': ['period']},
+            {'id': 'price_near_low', 'name': '52-Week Low', 'description': 'Near 52-week low (within 2%)'},
+            {'id': 'new_high', 'name': 'New High (5D)', 'description': 'New high in last 5 days'},
+            {'id': 'gap_up', 'name': 'Gap Up', 'description': 'Opening gap up', 'params': ['min_gap']},
+            {'id': 'gap_down', 'name': 'Gap Down', 'description': 'Opening gap down', 'params': ['min_gap']},
+        ],
+        'volume': [
+            {'id': 'high_volume', 'name': 'High Relative Volume', 'description': 'Volume above average', 'params': ['period', 'multiplier']},
+            {'id': 'unusual_volume', 'name': 'Unusual Volume', 'description': 'Volume 2x above average'},
+            {'id': 'volume_spike', 'name': 'Volume Spike', 'description': 'Volume 3x above average'},
+            {'id': 'increasing_volume', 'name': 'Increasing Volume', 'description': '3 consecutive days of increasing volume'},
+        ],
+        'momentum': [
+            {'id': 'strong_adx', 'name': 'Strong Trend (ADX)', 'description': 'ADX above threshold', 'params': ['threshold']},
+            {'id': 'rsi_oversold', 'name': 'RSI Oversold', 'description': 'RSI below 30', 'params': ['threshold']},
+            {'id': 'rsi_overbought', 'name': 'RSI Overbought', 'description': 'RSI above 70', 'params': ['threshold']},
+            {'id': 'macd_bullish', 'name': 'MACD Bullish', 'description': 'MACD above signal line'},
+            {'id': 'macd_crossover', 'name': 'MACD Crossover', 'description': 'MACD crossed above signal (last 3 bars)'},
+            {'id': 'rsi_divergence', 'name': 'RSI Bullish Divergence', 'description': 'Price lower, RSI higher'},
+        ],
+        'volatility': [
+            {'id': 'high_volatility', 'name': 'High Volatility', 'description': 'ATR 1.5x above average'},
+            {'id': 'bollinger_squeeze', 'name': 'Bollinger Squeeze', 'description': 'Narrow Bollinger Bands'},
+            {'id': 'bollinger_expansion', 'name': 'Bollinger Expansion', 'description': 'Expanding Bollinger Bands'},
+        ],
+        'patterns': [
+            {'id': 'bullish_engulfing', 'name': 'Bullish Engulfing', 'description': 'Bullish engulfing candle pattern'},
+            {'id': 'bearish_engulfing', 'name': 'Bearish Engulfing', 'description': 'Bearish engulfing candle pattern'},
+            {'id': 'doji', 'name': 'Doji', 'description': 'Doji candle pattern'},
+            {'id': 'hammer', 'name': 'Hammer', 'description': 'Hammer candle pattern'},
+        ],
+        'performance': [
+            {'id': 'gainers_1d', 'name': 'Top Gainers (1D)', 'description': 'Daily gainers', 'params': ['min_gain']},
+            {'id': 'losers_1d', 'name': 'Top Losers (1D)', 'description': 'Daily losers', 'params': ['min_loss']},
+            {'id': 'gainers_1w', 'name': 'Top Gainers (1W)', 'description': 'Weekly gainers', 'params': ['min_gain']},
+            {'id': 'gainers_1m', 'name': 'Top Gainers (1M)', 'description': 'Monthly gainers', 'params': ['min_gain']},
+        ]
+    }
+
+
+@api_router.get("/strategies/templates")
+async def get_strategy_templates():
+    \"\"\"Get famous pre-built strategy templates\"\"\"
+    return get_all_templates()
+
+
+@api_router.get("/strategies/templates/{template_id}")
+async def get_strategy_template(template_id: str):
+    \"\"\"Get specific strategy template by ID\"\"\"
+    template = get_template_by_id(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return template
 
 
 app.include_router(api_router)
