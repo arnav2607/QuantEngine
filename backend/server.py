@@ -355,21 +355,6 @@ async def get_screener_filters():
     }
 
 
-@api_router.get("/strategies/templates")
-async def get_strategy_templates():
-    """Get famous pre-built strategy templates"""
-    return get_all_templates()
-
-
-@api_router.get("/strategies/templates/{template_id}")
-async def get_strategy_template(template_id: str):
-    """Get specific strategy template by ID"""
-    template = get_template_by_id(template_id)
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return template
-
-
 app.include_router(api_router)
 
 app.add_middleware(
