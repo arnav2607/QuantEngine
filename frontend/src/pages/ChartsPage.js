@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { createChart } from 'lightweight-charts';
 import { TrendingUp, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,8 +15,7 @@ const ChartsPage = () => {
   const [selectedStocks, setSelectedStocks] = useState([]);
   const [timeframe, setTimeframe] = useState('1d');
   const chartContainerRef = useRef(null);
-  const chartRef = useRef(null);
-  const seriesRefs = useRef([]);
+  const chartInstanceRef = useRef(null);
 
   useEffect(() => {
     fetchStocks();
@@ -30,7 +30,7 @@ const ChartsPage = () => {
   const fetchStocks = async () => {
     try {
       const response = await axios.get(`${API}/stocks/all`);
-      setStocks(response.data.slice(0, 100)); // Show first 100 for dropdown
+      setStocks(response.data.slice(0, 100));
     } catch (error) {
       console.error('Error fetching stocks:', error);
     }
@@ -38,17 +38,19 @@ const ChartsPage = () => {
 
   const loadChartData = async () => {
     try {
-      if (!chartContainerRef.current) return;
-
-      // Clear existing chart
-      if (chartRef.current) {
-        chartRef.current.remove();
+      if (!chartContainerRef.current) {
+        console.log('No chart container');
+        return;
       }
 
-      // Create new chart with correct import
-      const { createChart: createLightweightChart } = await import('lightweight-charts');
-      
-      const chart = createLightweightChart(chartContainerRef.current, {
+      // Remove existing chart
+      if (chartInstanceRef.current) {
+        chartInstanceRef.current.remove();
+        chartInstanceRef.current = null;
+      }
+
+      // Create chart with correct width
+      const chart = createChart(chartContainerRef.current, {
         width: chartContainerRef.current.clientWidth,
         height: 500,
         layout: {
@@ -59,16 +61,19 @@ const ChartsPage = () => {
           vertLines: { color: '#374151' },
           horzLines: { color: '#374151' },
         },
+        crosshair: {
+          mode: 1,
+        },
         timeScale: {
           borderColor: '#4b5563',
+          timeVisible: true,
         },
         rightPriceScale: {
           borderColor: '#4b5563',
         },
       });
 
-      chartRef.current = chart;
-      seriesRefs.current = [];
+      chartInstanceRef.current = chart;
 
       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
