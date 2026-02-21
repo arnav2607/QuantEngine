@@ -60,12 +60,12 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Price action filter error: {str(e)}\")
+            logger.error(f"Price action filter error: {str(e)}")
             return False
     
     @staticmethod
     def screen_volume(df: pd.DataFrame, filter_type: str, params: Dict = None) -> bool:
-        \"\"\"Screen based on volume filters\"\"\"
+        """Screen based on volume filters"""
         if df.empty or len(df) < 20:
             return False
         
@@ -93,12 +93,12 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Volume filter error: {str(e)}\")
+            logger.error(f"Volume filter error: {str(e)}")
             return False
     
     @staticmethod
     def screen_momentum(df: pd.DataFrame, filter_type: str, params: Dict = None) -> bool:
-        \"\"\"Screen based on momentum indicators\"\"\"
+        """Screen based on momentum indicators"""
         if df.empty or len(df) < 50:
             return False
         
@@ -148,12 +148,12 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Momentum filter error: {str(e)}\")
+            logger.error(f"Momentum filter error: {str(e)}")
             return False
     
     @staticmethod
     def screen_volatility(df: pd.DataFrame, filter_type: str, params: Dict = None) -> bool:
-        \"\"\"Screen based on volatility\"\"\"
+        """Screen based on volatility"""
         if df.empty or len(df) < 30:
             return False
         
@@ -182,12 +182,12 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Volatility filter error: {str(e)}\")
+            logger.error(f"Volatility filter error: {str(e)}")
             return False
     
     @staticmethod
     def screen_pattern(df: pd.DataFrame, filter_type: str, params: Dict = None) -> bool:
-        \"\"\"Screen based on chart patterns\"\"\"
+        """Screen based on chart patterns"""
         if df.empty or len(df) < 10:
             return False
         
@@ -229,12 +229,12 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Pattern filter error: {str(e)}\")
+            logger.error(f"Pattern filter error: {str(e)}")
             return False
     
     @staticmethod
     def screen_performance(df: pd.DataFrame, filter_type: str, params: Dict = None) -> bool:
-        \"\"\"Screen based on performance metrics\"\"\"
+        """Screen based on performance metrics"""
         if df.empty or len(df) < 30:
             return False
         
@@ -267,5 +267,5 @@ class AdvancedScreener:
             
             return False
         except Exception as e:
-            logger.error(f\"Performance filter error: {str(e)}\")
+            logger.error(f"Performance filter error: {str(e)}")
             return False
