@@ -10,7 +10,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const Dashboard = () => {
   const [stats, setStats] = useState({
     totalStrategies: 0,
-    popularStocks: []
+    popularStocks: [],
+    templates: []
   });
 
   useEffect(() => {
@@ -19,14 +20,16 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [strategiesRes, stocksRes] = await Promise.all([
+      const [strategiesRes, stocksRes, templatesRes] = await Promise.all([
         axios.get(`${API}/strategies`),
-        axios.get(`${API}/stocks/popular`)
+        axios.get(`${API}/stocks/popular`),
+        axios.get(`${API}/strategies/templates`)
       ]);
 
       setStats({
         totalStrategies: strategiesRes.data.length,
-        popularStocks: stocksRes.data.slice(0, 6)
+        popularStocks: stocksRes.data.slice(0, 6),
+        templates: templatesRes.data
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
