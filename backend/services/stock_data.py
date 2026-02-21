@@ -6,35 +6,15 @@ import pandas as pd
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import logging
+import sys
+sys.path.append('/app/backend')
+from data.nifty_stocks import get_all_stocks, get_stocks_by_index, get_stocks_by_sector, NIFTY_50_STOCKS, NIFTY_BANK_STOCKS
 
 logger = logging.getLogger(__name__)
 
 
 class StockDataService:
     """Fetch and manage stock data"""
-    
-    POPULAR_STOCKS = {
-        'RELIANCE.NS': 'Reliance Industries',
-        'TCS.NS': 'Tata Consultancy Services',
-        'INFY.NS': 'Infosys',
-        'HDFCBANK.NS': 'HDFC Bank',
-        'ICICIBANK.NS': 'ICICI Bank',
-        'HINDUNILVR.NS': 'Hindustan Unilever',
-        'ITC.NS': 'ITC Limited',
-        'SBIN.NS': 'State Bank of India',
-        'BHARTIARTL.NS': 'Bharti Airtel',
-        'BAJFINANCE.NS': 'Bajaj Finance',
-        'KOTAKBANK.NS': 'Kotak Mahindra Bank',
-        'LT.NS': 'Larsen & Toubro',
-        'ASIANPAINT.NS': 'Asian Paints',
-        'MARUTI.NS': 'Maruti Suzuki',
-        'TITAN.NS': 'Titan Company',
-        'WIPRO.NS': 'Wipro',
-        'HCLTECH.NS': 'HCL Technologies',
-        'ADANIENT.NS': 'Adani Enterprises',
-        'TATAMOTORS.NS': 'Tata Motors',
-        'SUNPHARMA.NS': 'Sun Pharmaceutical'
-    }
     
     INDICES = {
         '^NSEI': 'Nifty 50',
