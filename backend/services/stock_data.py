@@ -43,7 +43,7 @@ class StockDataService:
                     logger.warning(f"Intraday data limited to 60 days")
             
             ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date, interval=interval)
+            df = ticker.history( period="max",interval=interval,auto_adjust=True)
             
             if df.empty:
                 return pd.DataFrame()

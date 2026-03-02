@@ -123,6 +123,7 @@ const ChartsPage = () => {
           if (chartData.length > 0) {
             candleSeries.setData(chartData);
             chart.timeScale().fitContent();
+            chart.timeScale().resetTimeScale();
             toast.success(`Loaded ${chartData.length} candles for ${symbol}`);
             console.log(`✓ Chart loaded: ${chartData.length} candles for ${symbol}`);
           } else {
