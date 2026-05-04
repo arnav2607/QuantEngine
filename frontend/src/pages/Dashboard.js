@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Activity, Target, BarChart3, ArrowRight } from 'lucide-react';
+import { TrendingUp, Activity, Target, BarChart3, ArrowRight, TrendingUpDownIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,7 +28,7 @@ const Dashboard = () => {
 
       setStats({
         totalStrategies: strategiesRes.data.length,
-        popularStocks: stocksRes.data.slice(0, 6),
+        popularStocks: stocksRes.data.slice(0, 9),
         templates: templatesRes.data
       });
     } catch (error) {
@@ -39,10 +39,10 @@ const Dashboard = () => {
   const features = [
     {
       icon: Activity,
-      title: 'Strategy Builder',
-      description: 'Create no-code trading strategies with 10+ technical indicators',
+      title: 'Fundamental Analysis',
+      description: 'In-depth financial metrics and ratios for Fundamental Analysis',
       color: 'from-blue-500 to-cyan-500',
-      link: '/builder'
+      link: '/fundamentals/loading'
     },
     {
       icon: BarChart3,
@@ -59,7 +59,7 @@ const Dashboard = () => {
       link: '/screener'
     },
     {
-      icon: TrendingUp,
+      icon: TrendingUpDownIcon,
       title: 'Live Analytics',
       description: 'Real-time charts with indicator overlays and signal detection',
       color: 'from-orange-500 to-red-500',
@@ -110,7 +110,7 @@ const Dashboard = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Available Stocks</CardDescription>
-            <CardTitle className="text-3xl font-['JetBrains_Mono']">20+</CardTitle>
+            <CardTitle className="text-3xl font-['JetBrains_Mono']">500+</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">NSE & BSE top stocks + indices</p>

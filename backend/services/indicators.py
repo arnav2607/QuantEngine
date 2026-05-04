@@ -201,8 +201,8 @@ class IndicatorService:
             'MA': {
                 'name': 'Moving Average',
                 'category': 'Trend',
-                'description': 'Foundation of trend filtering. Smooths price data to identify direction.',
-                'formula': 'SMA = Sum(Price, n) / n; EMA uses exponential weighting',
+                'description': 'A Moving Average smooths out price data by averaging past prices over a specified period. SMA gives equal weight to all prices, while EMA gives more weight to recent prices.',
+                'formula': 'SMA = Sum(Price, Period) / Period;EMA= Price(t) * k + EMA(y) * (1 - k); k = 2 / (Period + 1),y=previous EMA',
                 'parameters': {
                     'period': {'type': 'int', 'default': 20, 'range': [5, 200]},
                     'type': {'type': 'select', 'options': ['SMA', 'EMA'], 'default': 'SMA'},
@@ -212,21 +212,32 @@ class IndicatorService:
             'Donchian': {
                 'name': 'Donchian Channel',
                 'category': 'Breakout',
-                'description': 'Core of Turtle trading systems. Tracks highest high and lowest low.',
+                'description': 'Tracks highest high and lowest low.Creates a range for breakouts. Great for trend-following strategies.',
                 'formula': 'Upper = Highest(High, n); Lower = Lowest(Low, n)',
                 'parameters': {
                     'upper_period': {'type': 'int', 'default': 20, 'range': [10, 252]},
-                    'lower_period': {'type': 'int', 'default': 10, 'range': [5, 100]}
+                    'lower_period': {'type': 'int', 'default': 20, 'range': [10, 252]}
                 }
             },
             'ATR': {
                 'name': 'Average True Range',
                 'category': 'Volatility',
-                'description': 'Measures market volatility. Used for stop-loss and position sizing.',
-                'formula': 'TR = max(High-Low, |High-Close_prev|, |Low-Close_prev|); ATR = MA(TR)',
+                'description': 'Measures market volatility. Multiplier with ATR used for  stop-loss and position sizing.',
+                'formula': 'TrueRamge(TR) = max(High-Low, |High-Close_prev|, |Low-Close_prev|); ATR = Average(TR)',
                 'parameters': {
                     'period': {'type': 'int', 'default': 14, 'range': [7, 30]},
-                    'multiplier': {'type': 'float', 'default': 2.0, 'range': [1.0, 5.0]}
+                    'multiplier': {'type': 'float', 'default': 2.0, 'range': [1.0, 5.0]},
+                    'source': {'type': 'select', 'options': ['Close', 'High', 'Low', 'Open'], 'default': 'Close'}        
+                }
+            },
+            'SuperTrend':{
+                'name': 'SuperTrend',
+                'category': 'Trend',
+                'description': 'Trend-following indicator using ATR. Clean buy/sell signals.',
+                'formula': 'Upper/Lower Bands based on (High+Low)/2 ± (Multiplier * ATR).If trend is upwards, SuperTrend = Lower Band; if downwards, SuperTrend = Upper Band.',
+                'parameters': {
+                    'atr_period': {'type': 'int', 'default': 10, 'range': [7, 20]},
+                    'multiplier': {'type': 'float', 'default': 3.0, 'range': [1.0, 5.0]}
                 }
             },
             'ADX': {
@@ -281,21 +292,12 @@ class IndicatorService:
                     'std_dev': {'type': 'float', 'default': 2.0, 'range': [1.0, 3.0]}
                 }
             },
-            'Supertrend': {
-                'name': 'Supertrend',
-                'category': 'Trend',
-                'description': 'Trend-following indicator using ATR. Clean buy/sell signals.',
-                'formula': 'Upper/Lower Bands based on (High+Low)/2 ± (Multiplier * ATR)',
-                'parameters': {
-                    'atr_period': {'type': 'int', 'default': 10, 'range': [7, 20]},
-                    'multiplier': {'type': 'float', 'default': 3.0, 'range': [1.0, 5.0]}
-                }
-            },
             'VWAP': {
                 'name': 'VWAP',
                 'category': 'Institutional Benchmark',
                 'description': 'Volume-weighted average price. Key level for intraday traders.',
                 'formula': 'VWAP = Σ(Price * Volume) / Σ(Volume)',
-                'parameters': {}
+                'parameters': {
+                }
             }
         }

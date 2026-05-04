@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '@/contexts/ThemeContext';
 import { 
   LayoutDashboard, TrendingUp, Search, BookOpen, 
-  Settings, Sun, Moon, Menu, X, Activity, BarChart3
+  Settings, Sun, Moon, Menu, X, Activity, BarChart3,
+  BookAIcon,
+  BookMarkedIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -13,12 +15,14 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    {name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Stock Screener', href: '/screener', icon: Search },
+    {name:'Fundamentals', href:'/fundamentals/loading', icon: BookMarkedIcon},
+    {name: 'Charts', href: '/charts/loading', icon: BarChart3 },
     { name: 'Strategy Builder', href: '/builder', icon: Activity },
     { name: 'Saved Strategies', href: '/strategies', icon: TrendingUp },
-    { name: 'Charts', href: '/charts', icon: BarChart3 },
-    { name: 'Stock Screener', href: '/screener', icon: Search },
     { name: 'Indicators', href: '/indicators', icon: BookOpen },
+    
   ];
 
   return (

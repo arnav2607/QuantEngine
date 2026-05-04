@@ -40,12 +40,23 @@ const SavedStrategies = () => {
   };
 
   const runBacktest = async (strategy) => {
+
+    console.log("Strategy sent to backend:", strategy);
+  
     try {
-      toast.loading('Running backtest...');
       const response = await axios.post(`${API}/backtest`, strategy);
-      toast.success('Backtest completed!');
-      navigate('/results', { state: { result: response.data } });
+  
+      console.log("Navigating with strategy:", strategy);
+  
+      navigate('/results', {
+        state: {
+          result: response.data,
+          strategyData: strategy
+        }
+      });
+  
     } catch (error) {
+      console.error(error.response?.data);
       toast.error('Backtest failed');
     }
   };

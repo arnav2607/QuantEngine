@@ -11,6 +11,7 @@ import EnhancedScreener from '@/pages/EnhancedScreener';
 import IndicatorsPage from '@/pages/IndicatorsPage';
 import BacktestResults from '@/pages/BacktestResults';
 import ChartsPage from '@/pages/ChartsPage';
+import FundamentalAnalysis from './pages/FundamentalAnalysis';
 
 function App() {
   return (
@@ -24,7 +25,8 @@ function App() {
             <Route path="/screener" element={<EnhancedScreener />} />
             <Route path="/indicators" element={<IndicatorsPage />} />
             <Route path="/results" element={<BacktestResults />} />
-            <Route path="/charts" element={<ChartsPage />} />
+            <Route path="/charts/:symbol" element={<ChartsPage />} />
+            <Route path="/fundamentals/:paramSymbol" element={<FundamentalAnalysis/>} />
           </Routes>
         </Layout>
         <Toaster position="top-right" richColors />
