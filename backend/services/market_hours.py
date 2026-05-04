@@ -163,3 +163,18 @@ def needs_refresh(symbol: str) -> bool:
       - Market has closed today but we haven't fetched the closing bar yet.
     """
     return not is_today_data_fresh(symbol)
+
+
+def mark_all_stale(symbols: list) -> None:
+    """
+    Force-mark a list of symbols as stale by removing their price_metadata
+    records. The next call to needs_refresh() will return True for all of
+    them, triggering a fresh yfinance download.
+    """
+    try:
+        from database.collections import price_metadata
+        ns_symbols = [s if s.endswith(".NS") else s + ".NS" for s in symbols]
+        price_metadata.delete_many({"symbol": {"$in": ns_symbols}})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"mark_all_stale failed: {e}")

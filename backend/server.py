@@ -37,6 +37,7 @@ Startup
 """
 
 import threading
+import asyncio
 from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -367,6 +368,19 @@ async def run_backtest(strategy: StrategyCreate):
         if df.empty:
             raise HTTPException(status_code=404, detail="No stock data found")
 
+        # ✅ Clean up None/NaN in price data before backtest
+        # stock_data.py replaces NaN with None for JSON serialisation,
+        # but the backtest engine needs real floats for arithmetic.
+        for col in ["Open", "High", "Low", "Close", "Volume"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        df = df.dropna(subset=["Close"])
+        df[["Open", "High", "Low", "Close"]] = df[["Open", "High", "Low", "Close"]].ffill()
+        df["Volume"] = df["Volume"].fillna(0)
+        df = df.reset_index(drop=True)
+
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No valid price data after cleanup")
+
         # ✅ Run backtest
         strategy_obj = Strategy(**strategy.model_dump())
         engine = BacktestEngine(df, strategy_obj)
@@ -426,7 +440,7 @@ async def get_indices(universe_type: str):
 
     elif universe_type in screener.INDEXES:
         stocks = StockDataService.get_stocks_by_index(universe_type)
-        stocks=await db.stock_master.find({"index": universe_type}, {"_id": 0}).to_list()
+        stocks = await db.stock_master.find({"index": universe_type}, {"_id": 0}).to_list(length=None)
 
     elif universe_type in screener.SECTORS:
         stocks = StockDataService.get_stocks_by_sector(universe_type) 
@@ -442,10 +456,16 @@ async def get_indices(universe_type: str):
     logger.info(f"Universe Size: {len(symbols)}")
 
     # -----------------------------
-    # STEP 3: Load bulk data
-    # (always call — handles cache invalidation internally)
+    # STEP 3: Load bulk data (non-blocking)
+    # If the universe is small (< 100), force a refresh to show current prices.
+    # Otherwise, rely on the hourly cache to maintain performance.
     # -----------------------------
-    StockDataService.fetch_bulk_stock_data(symbols)
+    from services.market_hours import mark_all_stale
+    
+    if len(symbols) < 100:
+        mark_all_stale(symbols)
+        
+    await asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols)
 
     # -----------------------------
     # STEP 4: Process stocks
@@ -453,7 +473,8 @@ async def get_indices(universe_type: str):
     for stock in stocks:
 
         symbol = stock["symbol"]
-        name = stock["company_name"]
+        # Handle different key names from different sources
+        name = stock.get("company_name") or stock.get("name") or symbol.replace(".NS", "")
 
         df = StockDataService.bulk_cache.get(symbol)
 
@@ -467,8 +488,8 @@ async def get_indices(universe_type: str):
 
         # Skip rows with NaN price or volume
         if price != price or volume != volume:  # NaN check
-            price=0.0
-            volume=0.0
+            price = 0.0
+            volume = 0.0
 
         results.append(
             ScreenerResult(
@@ -510,10 +531,14 @@ async def run_screener(request: ScreenerRequest):
     logger.info(f"Universe Size: {len(symbols)}")
 
     # -----------------------------
-    # STEP 2: PRELOAD BULK DATA
-    # (always call — handles cache invalidation internally)
+    # STEP 2: PRELOAD BULK DATA (non-blocking)
     # -----------------------------
-    StockDataService.fetch_bulk_stock_data(symbols)
+    from services.market_hours import mark_all_stale
+    
+    if len(symbols) < 100:
+        mark_all_stale(symbols)
+
+    await asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols)
 
     # -----------------------------
     # NO FILTER CASE (FAST PATH)
@@ -523,7 +548,7 @@ async def run_screener(request: ScreenerRequest):
         for stock in stocks:
 
             symbol = stock["symbol"]
-            name = stock["name"]
+            name = stock.get("company_name") or stock.get("name") or symbol.replace(".NS", "")
 
             df = StockDataService.bulk_cache.get(symbol)
 
