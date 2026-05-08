@@ -319,7 +319,6 @@ const BacktestResults = () => {
     const loading = toast.loading("Running backtest...");
   
     try {
-  
       const updatedStrategy = {
         ...strategyData,
         stocks: [stock.symbol]
@@ -327,7 +326,11 @@ const BacktestResults = () => {
   
       console.log("Sending strategy:", updatedStrategy);
   
-      const response = await axios.post(`${API}/backtest`, updatedStrategy);
+      // Use Promise.all to ensure a minimum 3-second delay
+      const [response] = await Promise.all([
+        axios.post(`${API}/backtest`, updatedStrategy),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
   
       setStrategyData(updatedStrategy);
       setResult(response.data);

@@ -1240,6 +1240,7 @@ const [search, setSearch]               = useState("");
     max_open_trades:            existing?.max_open_trades            ?? 1,
     slippage_percent:         existing?.slippage_percent         ?? 1,
     leverage:                    existing?.leverage                    ?? 1,
+    mtf:                         existing?.mtf                         ?? false,
     breakdown_exit_pct:         existing?.breakdown_exit_pct         ?? null, 
     additional_exit_conditions : existing?.additional_exit_conditions ??  false,
   });
@@ -1321,10 +1322,16 @@ const [search, setSearch]               = useState("");
     try {
       setLoading(true);
       const toastId = toast.loading('Running backtest…');
-      const res = await axios.post(`${API}/backtest`, strategy);
+      
+      // Use Promise.all to ensure a minimum 3-second delay
+      const [res] = await Promise.all([
+        axios.post(`${API}/backtest`, strategy),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
+
       toast.dismiss(toastId);
       toast.success('Backtest complete!');
-      navigate('/results', { state: { result: res.data } });
+      navigate('/results', { state: { result: res.data, strategyData: strategy } });
     } catch (e) {
       toast.error('Backtest failed: ' + (e.response?.data?.detail || e.message));
     } finally {
@@ -1561,23 +1568,39 @@ const [search, setSearch]               = useState("");
                   onChange={e => set('max_open_trades', parseInt(e.target.value, 10) || 1)}
                 />
               </div>
+              {/* MTF — Margin Trading Facility */}
               <div className="space-y-1.5">
-                <Label>Leverage </Label>
-                <Tooltip>
-                  <TooltipTrigger><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
-                  <TooltipContent>
-                    Use margin to increase position size. Increases both potential returns and risk.
-                  </TooltipContent>
-                </Tooltip>
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    id="mtf-checkbox"
+                    className="w-4 h-4 cursor-pointer accent-primary"
+                    checked={strategy.mtf}
+                    onChange={e => {
+                      set('mtf', e.target.checked);
+                      if (!e.target.checked) set('leverage', 1);
+                    }}
+                  />
+                  <Label htmlFor="mtf-checkbox" className="cursor-pointer select-none">MTF</Label>
+                  <Tooltip>
+                    <TooltipTrigger><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
+                    <TooltipContent>Margin Trading Facility — borrow capital from broker to increase your position size. Multiplies both gains and losses.</TooltipContent>
+                  </Tooltip>
+                </div>
 
-                  value={strategy.leverage}
-                  onChange={e => set('leverage', parseInt(e.target.value, 10) || 1)}
-                />
-                
+                {strategy.mtf && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Leverage (×)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={strategy.leverage}
+                      onChange={e => set('leverage', Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* FIX: add max guard on slippage */}
