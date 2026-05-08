@@ -1330,6 +1330,7 @@ const [search, setSearch]               = useState("");
       ]);
 
       toast.dismiss(toastId);
+      toast.dismiss(toastId);
       toast.success('Backtest complete!');
       navigate('/results', { state: { result: res.data, strategyData: strategy } });
     } catch (e) {
