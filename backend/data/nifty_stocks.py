@@ -2335,14 +2335,14 @@ def get_all_stocks():
     """Get complete stock database"""
 
     all_stocks = (
-        NIFTY500+
-        NIFTY200 +
-        NIFTYTOTALMARKET +
+        NIFTY50 +
+        NIFTYNEXT50 +
+        NIFTY100 +
+        NIFTYSMALLCAP100 +
         NIFTY_MIDCAP150_STOCKS +
-        NIFTYSMALLCAP100+
-        NIFTY100+
-        NIFTYNEXT50+
-        NIFTY50+
+        NIFTY200 +
+        NIFTY500 +
+        NIFTYTOTALMARKET +
         NIFTY_CHEMICALS +
         NIFTY_METAL +
         NIFTY_OILANDGAS +

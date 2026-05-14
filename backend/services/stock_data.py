@@ -674,6 +674,9 @@ class StockDataService:
     @staticmethod
     def get_stocks_by_index(index_name: str) -> list:
         """Return all stocks belonging to the given index (e.g. 'NIFTY50')."""
+        if index_name == "NIFTYTOTALMARKET":
+            return get_all_stocks()
+            
         return [s for s in get_all_stocks() if s.get("index") == index_name]
 
     @staticmethod
