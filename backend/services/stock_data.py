@@ -148,13 +148,23 @@ class StockDataService:
             pass
 
         loaded = 0
-        batch_size = 100
+        batch_size = 50
+        
+        # We only need BULK_CACHE_LIMIT (400) bars. 
+        # Filter for last 2 years of data to avoid loading full history 
+        # into the $group stage, which hits Atlas memory limits.
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=730)
         
         for i in range(0, len(symbols), batch_size):
             batch = symbols[i : i + batch_size]
             try:
                 pipeline = [
-                    {"$match": {"symbol": {"$in": batch}}},
+                    {
+                        "$match": {
+                            "symbol": {"$in": batch},
+                            "date": {"$gte": cutoff_date}
+                        }
+                    },
                     {"$sort":  {"symbol": 1, "date": -1}},
                     {"$group": {
                         "_id":  "$symbol",
