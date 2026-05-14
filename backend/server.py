@@ -63,12 +63,19 @@ from services.backtest import BacktestEngine
 from services.advanced_screener import AdvancedScreener
 from data.strategy_templates import get_all_templates, get_template_by_id
 from data.nifty_stocks import get_all_stocks as get_all_stocks_list
+from services.scheduler import background_stock_refresher
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+# Add timeout and other stable connection options for Atlas SRV resolution
+client = AsyncIOMotorClient(
+    mongo_url,
+    connectTimeoutMS=30000,
+    socketTimeoutMS=30000,
+    serverSelectionTimeoutMS=30000
+)
 db = client[os.environ['DB_NAME']]
 
 app = FastAPI(title="QuantEdge API")
@@ -84,6 +91,7 @@ def process_symbol(symbol, request, screener):
         df = StockDataService.bulk_cache.get(symbol)
 
         if df is None or df.empty:
+            # logger.warning(f"Screener: No data in cache for {symbol}")
             return None
 
         latest = df.iloc[-1]
@@ -123,6 +131,7 @@ def process_symbol(symbol, request, screener):
 
             # IMPORTANT: fail immediately if a filter fails
             if not matched:
+                # logger.info(f"Stock {symbol} failed filter {filter_type}")
                 return None
 
         matched_filters.append(filter_type)
@@ -149,7 +158,7 @@ def process_symbol(symbol, request, screener):
         )
 
     except Exception as e:
-        logger.error(f"Screener error for {symbol}: {str(e)}")
+        logger.error(f"Screener error for {symbol}: {str(e)}", exc_info=True)
         return None
 
 @api_router.get("/")
@@ -440,7 +449,8 @@ async def get_indices(universe_type: str):
 
     elif universe_type in screener.INDEXES:
         stocks = StockDataService.get_stocks_by_index(universe_type)
-        stocks = await db.stock_master.find({"index": universe_type}, {"_id": 0}).to_list(length=None)
+        if not stocks:
+             stocks = await db.stock_master.find({"index": universe_type}, {"_id": 0}).to_list(length=None)
 
     elif universe_type in screener.SECTORS:
         stocks = StockDataService.get_stocks_by_sector(universe_type) 
@@ -460,12 +470,10 @@ async def get_indices(universe_type: str):
     # If the universe is small (< 100), force a refresh to show current prices.
     # Otherwise, rely on the hourly cache to maintain performance.
     # -----------------------------
-    from services.market_hours import mark_all_stale
-    
-    if len(symbols) < 100:
-        mark_all_stale(symbols)
-        
-    await asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols)
+    # -----------------------------
+    # STEP 3: Load bulk data (background)
+    # -----------------------------
+    asyncio.create_task(asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols))
 
     # -----------------------------
     # STEP 4: Process stocks
@@ -519,9 +527,13 @@ async def run_screener(request: ScreenerRequest):
 
     elif request.universe_type in screener.INDEXES:
         stocks = StockDataService.get_stocks_by_index(request.universe_type)
+        if not stocks:
+            stocks = await db.stock_master.find({"index": request.universe_type}, {"_id": 0}).to_list(length=None)
 
     elif request.universe_type in screener.SECTORS:
         stocks = StockDataService.get_stocks_by_sector(request.universe_type)
+        if not stocks:
+            stocks = await db.stock_master.find({"sector": request.universe_type}, {"_id": 0}).to_list(length=None)
 
     else:
         raise HTTPException(status_code=400, detail="Invalid universe type")
@@ -531,14 +543,18 @@ async def run_screener(request: ScreenerRequest):
     logger.info(f"Universe Size: {len(symbols)}")
 
     # -----------------------------
-    # STEP 2: PRELOAD BULK DATA (non-blocking)
+    # STEP 2: PRELOAD BULK DATA (background)
     # -----------------------------
-    from services.market_hours import mark_all_stale
+    # We trigger a background refresh. If the cache is empty, the current request
+    # will wait just long enough to get data, otherwise it returns what we have.
+    bg_task = asyncio.create_task(asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols))
     
-    if len(symbols) < 100:
-        mark_all_stale(symbols)
-
-    await asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols)
+    # Check if we have at least SOME data in cache to show. 
+    # If cache is completely empty for this universe, wait for the background task to make some progress.
+    missing_data = sum(1 for s in symbols if s not in StockDataService.bulk_cache)
+    if missing_data > len(symbols) * 0.5:
+        logger.info(f"Cache is mostly empty ({missing_data}/{len(symbols)}). Waiting for initial fetch...")
+        await bg_task
 
     # -----------------------------
     # NO FILTER CASE (FAST PATH)
@@ -1545,9 +1561,11 @@ def load_stock_data_on_startup():
         except Exception as e:
             logger.error(f"[Startup] Stock loader error: {e}")
 
-    thread = threading.Thread(target=background_loader, daemon=True)
-    thread.start()
-    logger.info("[Startup] Background stock loader started")
+    threading.Thread(target=background_loader, daemon=True).start()
+    
+    # Start the continuous 3-minute background refresher
+    asyncio.create_task(background_stock_refresher())
+    logger.info("[Startup] Background stock loader and refresher started")
 
 
 @app.on_event("shutdown")

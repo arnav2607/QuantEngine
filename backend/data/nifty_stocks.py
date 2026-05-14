@@ -2359,7 +2359,15 @@ def get_all_stocks():
         NIFTY_MEDIA
     )
 
-    return all_stocks
+    # De-duplicate by symbol to keep the database lean
+    seen = set()
+    unique_stocks = []
+    for s in all_stocks:
+        if s['symbol'] not in seen:
+            unique_stocks.append(s)
+            seen.add(s['symbol'])
+
+    return unique_stocks
 
 
 # Cache database

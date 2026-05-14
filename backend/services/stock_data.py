@@ -145,10 +145,11 @@ class StockDataService:
             # cache anymore — just add missing ones and refresh stale ones.
             # This makes the screener much faster when switching between indices.
 
-            # Step 1 — Load all available history from MongoDB
+            # Step 1 — Load recent history from MongoDB
+            # Limit to 500 bars for screener indicators (RSI, MA, etc.)
             for symbol in symbols:
                 if symbol not in StockDataService.bulk_cache:
-                    df = load_daily_prices(symbol)
+                    df = load_daily_prices(symbol, limit=500)
                     if not df.empty:
                         StockDataService.bulk_cache[symbol] = df
 
@@ -287,10 +288,9 @@ class StockDataService:
                     # Stamp this symbol as freshly fetched (resets staleness timer)
                     mark_symbol_fetched(symbol)
 
-                    # Reload the full history from MongoDB into bulk_cache so
-                    # the cache always contains the complete picture, not just
-                    # the incremental slice we just downloaded.
-                    StockDataService.bulk_cache[symbol] = load_daily_prices(symbol)
+                    # Reload the recent history from MongoDB into bulk_cache so
+                    # the cache stays lean for the screener.
+                    StockDataService.bulk_cache[symbol] = load_daily_prices(symbol, limit=500)
 
                 except Exception as e:
                     logger.error(f"[StockDataService] Error processing {symbol}: {str(e)}")

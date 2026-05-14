@@ -1249,7 +1249,7 @@ const [search, setSearch]               = useState("");
 
   const fetchStocks = async () => {
     try {
-      const res = await axios.get(`${API}/stocks/popular`);
+      const res = await axios.get(`${API}/stocks/all`);
       setStocks(res.data);
     } catch { /* silent */ }
   };
@@ -1322,6 +1322,7 @@ const [search, setSearch]               = useState("");
     try {
       setLoading(true);
       const toastId = toast.loading('Running backtest…');
+
       
       // Use Promise.all to ensure a minimum 3-second delay
       const [res] = await Promise.all([
@@ -1330,10 +1331,10 @@ const [search, setSearch]               = useState("");
       ]);
 
       toast.dismiss(toastId);
-      toast.dismiss(toastId);
       toast.success('Backtest complete!');
       navigate('/results', { state: { result: res.data, strategyData: strategy } });
     } catch (e) {
+      toast.dismiss(toastId);
       toast.error('Backtest failed: ' + (e.response?.data?.detail || e.message));
     } finally {
       setLoading(false);
@@ -1582,7 +1583,7 @@ const [search, setSearch]               = useState("");
                       if (!e.target.checked) set('leverage', 1);
                     }}
                   />
-                  <Label htmlFor="mtf-checkbox" className="cursor-pointer select-none">MTF</Label>
+                  <Label htmlFor="mtf-checkbox" className="cursor-pointer select-none">ANY WANT TO USE MTF</Label>
                   <Tooltip>
                     <TooltipTrigger><Info className="w-3.5 h-3.5 text-muted-foreground" /></TooltipTrigger>
                     <TooltipContent>Margin Trading Facility — borrow capital from broker to increase your position size. Multiplies both gains and losses.</TooltipContent>

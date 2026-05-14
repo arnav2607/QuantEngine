@@ -117,7 +117,7 @@ class AdvancedScreener:
 
         if filter_type == "price_above_ma":
 
-            period = params.get("period", 9)
+            period = int(params.get("period", 9))
 
             if len(df) < period:
                 return False
@@ -133,7 +133,7 @@ class AdvancedScreener:
             return current_price <= low_52 * 1.02
 
         if filter_type == "new_high":
-            period = params.get("period", 5)
+            period = int(params.get("period", 5))
             
             if len(df) < period:
                 return False
@@ -144,7 +144,7 @@ class AdvancedScreener:
         
         if filter_type == "new_low":
             
-            period = params.get("period", 5)
+            period = int(params.get("period", 5))
 
             if len(df) < period + 1:
                 return False
@@ -171,21 +171,21 @@ class AdvancedScreener:
 
         if filter_type == "high_volume":
 
-            period = params.get("period", 20)
-            multiplier = params.get("multiplier", 1.5)
+            period = int(params.get("period", 20))
+            multiplier = float(params.get("multiplier", 1.5))
 
             avg_volume = df["Volume"].iloc[-(period+1):-1].mean()
 
             return current_volume > avg_volume*multiplier
 
         if filter_type == "unusual_volume":
-            period = params.get("period", 20)
+            period = int(params.get("period", 20))
             avg_volume = df["Volume"].iloc[-(period+1):-1].mean()
 
             return current_volume > avg_volume * 2
 
         if filter_type == "volume_spike":
-            period = params.get("period", 20)
+            period = int(params.get("period", 20))
             avg_volume = df["Volume"].iloc[-(period+1):-1].mean()
 
             return current_volume > avg_volume * 3
@@ -227,8 +227,7 @@ class AdvancedScreener:
         if filter_type == "macd_bullish":
 
             macd = indicators["macd"]
-
-            
+            return macd["macd"].iloc[-1] > macd["signal"].iloc[-1]
 
         if filter_type == "macd_bearish":
 

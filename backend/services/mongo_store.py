@@ -109,17 +109,29 @@ def upsert_daily_prices(symbol: str, df: pd.DataFrame) -> int:
 # READ — full history
 # ---------------------------------------------------------------------------
 
-def load_daily_prices(symbol: str) -> pd.DataFrame:
+def load_daily_prices(symbol: str, limit: int = None) -> pd.DataFrame:
     """
-    Load all daily OHLCV rows for `symbol` from MongoDB, sorted ascending by date.
+    Load daily OHLCV rows for `symbol` from MongoDB, sorted ascending by date.
+    
+    Args:
+        symbol: NSE ticker string.
+        limit:  Max number of recent bars to fetch. If None, fetches all history.
 
     Returns:
         DataFrame with columns [Date, Open, High, Low, Close, Volume].
         Empty DataFrame if no data exists for this symbol.
     """
-    docs = list(daily_prices.find({"symbol": symbol}, {"_id": 0}).sort("date", 1))
+    query = daily_prices.find({"symbol": symbol}, {"_id": 0}).sort("date", -1)
+    
+    if limit:
+        query = query.limit(limit)
+        
+    docs = list(query)
     if not docs:
         return pd.DataFrame()
+
+    # Since we sorted DESC to get the limit, we must reverse to return ASC for technical indicators
+    docs.reverse()
 
     df = pd.DataFrame(docs)
     df.rename(
