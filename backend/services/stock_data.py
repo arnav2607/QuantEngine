@@ -123,7 +123,7 @@ class StockDataService:
     }
 
     # Maps frontend timeframe string → yfinance interval string
-    supported_timeframes = {
+    TIMEFRAME_MAP = {
         "1m": "1m", "2m": "2m", "5m": "5m", "15m": "15m", "30m": "30m", 
         "1h": "1h", "1d": "1d", "1wk": "1wk", "1mo": "1mo",
     }
