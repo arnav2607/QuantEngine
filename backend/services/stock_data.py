@@ -135,59 +135,59 @@ class StockDataService:
     @staticmethod
     def bulk_load_from_mongo(symbols: list) -> int:
         """
-        Single aggregation query that pulls the most recent BULK_CACHE_LIMIT
-        bars for *all* `symbols` and populates bulk_cache in memory.
-
-        Replaces the previous loop that issued one find() per symbol —
-        on Atlas free tier that loop alone took 30–60s for ~750 symbols.
-
-        Returns the number of symbols loaded.
+        Aggregation query that pulls recent bars for `symbols` in batches.
+        Uses batches to avoid MongoDB's 32MB in-memory sort limit on Atlas free tier.
         """
         if not symbols:
             return 0
 
+        # Ensure index exists for fast sorting and to prevent memory limit errors
         try:
-            pipeline = [
-                {"$match": {"symbol": {"$in": symbols}}},
-                {"$sort":  {"symbol": 1, "date": -1}},
-                {"$group": {
-                    "_id":  "$symbol",
-                    "rows": {"$push": {
-                        "Date":   "$date",
-                        "Open":   "$open",
-                        "High":   "$high",
-                        "Low":    "$low",
-                        "Close":  "$close",
-                        "Volume": "$volume",
+            daily_prices.create_index([("symbol", 1), ("date", -1)])
+        except:
+            pass
+
+        loaded = 0
+        batch_size = 100
+        
+        for i in range(0, len(symbols), batch_size):
+            batch = symbols[i : i + batch_size]
+            try:
+                pipeline = [
+                    {"$match": {"symbol": {"$in": batch}}},
+                    {"$sort":  {"symbol": 1, "date": -1}},
+                    {"$group": {
+                        "_id":  "$symbol",
+                        "rows": {"$push": {
+                            "Date":   "$date",
+                            "Open":   "$open",
+                            "High":   "$high",
+                            "Low":    "$low",
+                            "Close":  "$close",
+                            "Volume": "$volume",
+                        }},
                     }},
-                }},
-                {"$project": {
-                    "_id":  1,
-                    "rows": {"$slice": ["$rows", BULK_CACHE_LIMIT]},
-                }},
-            ]
+                    {"$project": {
+                        "_id":  1,
+                        "rows": {"$slice": ["$rows", BULK_CACHE_LIMIT]},
+                    }},
+                ]
 
-            loaded = 0
-            for doc in daily_prices.aggregate(pipeline, allowDiskUse=True):
-                symbol = doc["_id"]
-                rows = doc["rows"]
-                if not rows:
-                    continue
-                df = pd.DataFrame(rows)
-                # rows are descending; reverse to ascending for indicators
-                df = df.iloc[::-1].reset_index(drop=True)
-                df["Date"] = pd.to_datetime(df["Date"])
-                StockDataService.bulk_cache[symbol] = df
-                loaded += 1
+                for doc in daily_prices.aggregate(pipeline, allowDiskUse=True):
+                    symbol = doc["_id"]
+                    rows = doc["rows"]
+                    if not rows:
+                        continue
+                    df = pd.DataFrame(rows)
+                    df = df.iloc[::-1].reset_index(drop=True)
+                    df["Date"] = pd.to_datetime(df["Date"])
+                    StockDataService.bulk_cache[symbol] = df
+                    loaded += 1
+            except Exception as e:
+                logger.error(f"[StockDataService] Batch load failed for {len(batch)} symbols: {e}")
 
-            logger.info(
-                f"[StockDataService] bulk_load_from_mongo: loaded {loaded} "
-                f"symbols via one aggregation"
-            )
-            return loaded
-        except Exception as e:
-            logger.error(f"[StockDataService] bulk_load_from_mongo failed: {e}")
-            return 0
+        logger.info(f"[StockDataService] bulk_load_from_mongo: loaded {loaded}/{len(symbols)} symbols")
+        return loaded
 
     # =========================================================================
     # PUBLIC: Indicator cache (used by the screener)
