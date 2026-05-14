@@ -593,7 +593,13 @@ class StockDataService:
                 df.rename(columns={"Datetime": "Date"}, inplace=True)
             df = df[["Date", "Open", "High", "Low", "Close", "Volume"]]
             df["Date"] = pd.to_datetime(df["Date"])
-            df = df.replace([np.nan, np.inf, -np.inf], None)
+            # Do NOT replace NaN with None here. The backtest engine needs
+            # real floats (NaN is a float) for arithmetic. If we use None,
+            # we get TypeError: unsupported operand type(s) for -: 'NoneType' and 'float'.
+            # df = df.replace([np.nan, np.inf, -np.inf], None)
+            
+            # Instead, handle inf if needed, but keep it numeric
+            df = df.replace([np.inf, -np.inf], np.nan)
             return df.reset_index(drop=True)
 
         except Exception as e:

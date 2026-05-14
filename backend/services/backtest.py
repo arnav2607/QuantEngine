@@ -1201,17 +1201,17 @@ class BacktestEngine:
         equity_curve: List[Dict] = []
         position: Optional[Dict] = None
 
-        leverage = self.strategy.leverage
-        equity = self.strategy.initial_capital
+        leverage = float(self.strategy.leverage or 1.0)
+        equity = float(self.strategy.initial_capital or 100000.0)
         peak_equity = equity
 
         df = self.df
         n = len(df)
         close = df['Close']
-        atr14 = self._cache['ATR_14']
+        atr14 = self._cache.get('ATR_14')
 
         strategy_type = self.strategy.strategy_type
-        slippage_pct = self.strategy.slippage_percent / 100
+        slippage_pct = float(self.strategy.slippage_percent or 0.05) / 100
         slippage_factor = 1 + slippage_pct
 
         direction = 1 if strategy_type == "long_only" else -1
@@ -1297,7 +1297,7 @@ class BacktestEngine:
                             exit_signal = True
 
                 # ATR SL/TP
-                if not exit_signal:
+                if not exit_signal and atr14 is not None:
                     atr_val = atr14.iloc[i]
                     if not pd.isna(atr_val):
                         if self.strategy.stop_loss_atr_multiplier:
@@ -1367,6 +1367,8 @@ class BacktestEngine:
                         pos_value = equity * leverage * (self.strategy.position_size_value / 100)
 
                     elif self.strategy.position_sizing == "atr_risk":
+                        if atr14 is None:
+                            continue
                         atr_val = atr14.iloc[i]
                         if pd.isna(atr_val):
                             continue
