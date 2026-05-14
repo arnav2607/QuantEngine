@@ -103,6 +103,17 @@ def process_symbol(symbol, request, screener):
             "volume": latest["Volume"]
         }
 
+        # Pre-compute (or fetch cached) indicators ONCE per symbol so each
+        # screen_momentum / screen_volatility call doesn't recompute them.
+        # This is the biggest single screener speed-up.
+        cached_indicators = None
+        needs_indicators = any(
+            f.filter_type in screener.MOMENTUM or f.filter_type in screener.VOLATILITY
+            for f in request.filters
+        )
+        if needs_indicators:
+            cached_indicators = StockDataService.get_cached_indicators(symbol)
+
         matched_filters = []
 
         for filter_item in request.filters:
@@ -118,10 +129,10 @@ def process_symbol(symbol, request, screener):
                 matched = screener.screen_volume(df, filter_type, params)
 
             elif filter_type in screener.MOMENTUM:
-                matched = screener.screen_momentum(df, filter_type, params)
+                matched = screener.screen_momentum(df, filter_type, params, cached_indicators)
 
             elif filter_type in screener.VOLATILITY:
-                matched = screener.screen_volatility(df, filter_type, params)
+                matched = screener.screen_volatility(df, filter_type, params, cached_indicators)
 
             elif filter_type in screener.PATTERNS:
                 matched = screener.screen_pattern(df, filter_type, params)
@@ -134,7 +145,7 @@ def process_symbol(symbol, request, screener):
                 # logger.info(f"Stock {symbol} failed filter {filter_type}")
                 return None
 
-        matched_filters.append(filter_type)
+            matched_filters.append(filter_type)
 
         current_price = df["Close"].iloc[-1]
         prev_price = df["Close"].iloc[-2]
@@ -164,6 +175,28 @@ def process_symbol(symbol, request, screener):
 @api_router.get("/")
 async def root():
     return {"message": "QuantEdge API - Strategy Backtester & Stock Screener"}
+
+
+@api_router.get("/health")
+async def health():
+    """
+    Ultra-light health endpoint. Used by uptime monitors (e.g. UptimeRobot,
+    cron-job.org) to keep Render's free tier dyno warm — every hit resets
+    the 15-min idle timer so users never see a 60-second cold start.
+
+    Returns immediately without DB, yfinance, or cache touches.
+    """
+    return {
+        "status":     "ok",
+        "service":    "quant-backend",
+        "cache_size": len(StockDataService.bulk_cache),
+    }
+
+
+# Also expose at root path so monitors can hit /health (not /api/health)
+@app.get("/health")
+async def root_health():
+    return {"status": "ok"}
 
 
 @api_router.get("/stocks/popular")
@@ -466,14 +499,12 @@ async def get_indices(universe_type: str):
     logger.info(f"Universe Size: {len(symbols)}")
 
     # -----------------------------
-    # STEP 3: Load bulk data (non-blocking)
-    # If the universe is small (< 100), force a refresh to show current prices.
-    # Otherwise, rely on the hourly cache to maintain performance.
+    # STEP 3: Load bulk data (background only if needed)
+    # Skip entirely when nothing is stale — the previous code spawned a
+    # thread on every request, hammering Mongo and the IST clock check.
     # -----------------------------
-    # -----------------------------
-    # STEP 3: Load bulk data (background)
-    # -----------------------------
-    asyncio.create_task(asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols))
+    if StockDataService.has_stale_symbols(symbols):
+        asyncio.create_task(asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols))
 
     # -----------------------------
     # STEP 4: Process stocks
@@ -543,18 +574,25 @@ async def run_screener(request: ScreenerRequest):
     logger.info(f"Universe Size: {len(symbols)}")
 
     # -----------------------------
-    # STEP 2: PRELOAD BULK DATA (background)
+    # STEP 2: PRELOAD BULK DATA (background, only when needed)
     # -----------------------------
-    # We trigger a background refresh. If the cache is empty, the current request
-    # will wait just long enough to get data, otherwise it returns what we have.
-    bg_task = asyncio.create_task(asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols))
-    
-    # Check if we have at least SOME data in cache to show. 
-    # If cache is completely empty for this universe, wait for the background task to make some progress.
-    missing_data = sum(1 for s in symbols if s not in StockDataService.bulk_cache)
-    if missing_data > len(symbols) * 0.5:
-        logger.info(f"Cache is mostly empty ({missing_data}/{len(symbols)}). Waiting for initial fetch...")
-        await bg_task
+    # Skip the refresh thread entirely when every symbol is fresh — this was
+    # the main reason the screener felt slow on every click.
+    bg_task = None
+    if StockDataService.has_stale_symbols(symbols):
+        bg_task = asyncio.create_task(
+            asyncio.to_thread(StockDataService.fetch_bulk_stock_data, symbols)
+        )
+
+        # If the cache is mostly cold (e.g. fresh dyno on Render after a
+        # cold start), wait for the initial fetch so we don't return [].
+        missing_data = sum(1 for s in symbols if s not in StockDataService.bulk_cache)
+        if missing_data > len(symbols) * 0.5:
+            logger.info(
+                f"Cache is mostly empty ({missing_data}/{len(symbols)}). "
+                f"Waiting for initial fetch..."
+            )
+            await bg_task
 
     # -----------------------------
     # NO FILTER CASE (FAST PATH)
@@ -1556,8 +1594,19 @@ def load_stock_data_on_startup():
             all_stocks = get_all_stocks_list()
             symbols = [s["symbol"] for s in all_stocks]
             logger.info(f"[Startup] Loading {len(symbols)} symbols into bulk_cache…")
+
+            # FAST PATH: one aggregation query pulls history for ALL symbols
+            # from Mongo at once (replaces the previous 750-call loop that
+            # took 30-60s on Atlas free tier).
+            StockDataService.bulk_load_from_mongo(symbols)
+
+            # SLOW PATH: only the symbols that are actually stale need yfinance
             StockDataService.fetch_bulk_stock_data(symbols)
-            logger.info(f"[Startup] bulk_cache ready with {len(StockDataService.bulk_cache)} stocks")
+
+            logger.info(
+                f"[Startup] bulk_cache ready with "
+                f"{len(StockDataService.bulk_cache)} stocks"
+            )
         except Exception as e:
             logger.error(f"[Startup] Stock loader error: {e}")
 

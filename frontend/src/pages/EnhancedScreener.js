@@ -1,347 +1,13 @@
-// import React, { useState, useEffect } from 'react';
-// import axios from 'axios';
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Button } from '@/components/ui/button';
-// import { Checkbox } from '@/components/ui/checkbox';
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-// import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-// import { Search, Filter, TrendingUp, Volume2, Activity, Zap, BarChart3, Target, PieChart, VolumeIcon, QrCodeIcon } from 'lucide-react';
-// import { toast } from 'sonner';
-// import { HistogramSeries } from 'lightweight-charts';
-// import { Link } from 'react-router-dom';
-
-// const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-// const EnhancedScreener = () => {
-//   const [stocks, setStocks] = useState([]);
-//   const [filters, setFilters] = useState({});
-//   const [availableFilters, setAvailableFilters] = useState({});
-//   const [results, setResults] = useState([]);
-//   const [loading, setLoading] = useState(false);
-//   const [selectedIndex, setSelectedIndex] = useState('ALL');
-//   const [searchTerm, setSearchTerm] = useState("");
-
-//   const filteredResults = results.filter((stock) =>
-//     stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-//     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
-//   );
-
-//   useEffect(() => {
-//     fetchStocks();
-//     fetchFilters();
-//   }, []);
-
-//   const fetchStocks = async () => {
-//     try {
-//       const response = await axios.get(`${API}/stocks/all`);
-//       setStocks(response.data);
-//     } catch (error) {
-//       console.error('Error fetching stocks:', error);
-//     }
-//   };
-
-//   const fetchFilters = async () => {
-//     try {
-//       const response = await axios.get(`${API}/screener/filters`);
-//       setAvailableFilters(response.data);
-//     } catch (error) {
-//       console.error('Error fetching filters:', error);
-//     }
-//   };
-
-//   const toggleFilter = (filterId) => {
-//     setFilters(prev => ({
-//       ...prev,
-//       [filterId]: !prev[filterId]
-//     }));
-//   };
-
-//   const runScreener = async () => {
-
-//     const activeFilters = Object.entries(filters)
-//       .filter(([_, enabled]) => enabled)
-//       .map(([type, _]) => ({ filter_type: type }));
-  
-//     setLoading(true);
-  
-//     try {
-  
-//       // ---------------------------------------
-//       // CASE 1: NO FILTER SELECTED
-//       // ---------------------------------------
-//       if (activeFilters.length === 0) {
-  
-//         const response = await axios.get(`${API}/indices`, {
-//           params: {
-//             universe_type: selectedIndex,
-//             filters:activeFilters,
-//             date:null
-
-//           }
-//         });
-  
-//         setResults(response.data);
-  
-//         toast.success(`Showing ${response.data.length} stocks`);
-  
-//         return;
-//       }
-  
-//       // ---------------------------------------
-//       // CASE 2: FILTERS SELECTED
-//       // ---------------------------------------
-  
-//       const response = await axios.post(`${API}/screener`, {
-//         universe_type: selectedIndex,
-//         filters: activeFilters,
-//         date: null
-//       });
-  
-//       setResults(response.data);
-  
-//       toast.success(`Found ${response.data.length} matching stocks`);
-  
-//     } catch (error) {
-  
-//       toast.error("Screener failed");
-//       console.error(error);
-  
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const filterCategories = [
-//     { id: 'price_action', name: 'Price Action', icon: TrendingUp, color: 'text-blue-500' },
-//     { id: 'volume', name: 'Volume', icon:BarChart3, color: 'text-green-500' },
-//     { id: 'momentum', name: 'Momentum', icon: Activity, color: 'text-purple-500' },
-//     { id: 'volatility', name: 'Volatility', icon: Zap, color: 'text-orange-500' },
-//     { id: 'patterns', name: 'Patterns', icon:QrCodeIcon, color: 'text-pink-500' },
-//     { id: 'performance', name: 'Performance', icon: Target, color: 'text-cyan-500' }
-    
-//   ];
-
-//   return (
-//     <div className="space-y-6" data-testid="enhanced-screener">
-//       <div>
-//         <h1 className="text-3xl font-bold font-['Rajdhani']">
-//           Advanced Stock Screener
-//         </h1>
-//         <p className="text-muted-foreground">
-//           28 professional filters across 6 categories - {stocks.length} stocks
-//           available
-//         </p>
-//       </div>
-
-//       <Tabs defaultValue="filters" className="space-y-4">
-//         <TabsList>
-//           <TabsTrigger value="filters">
-//             <Filter className="w-4 h-4 mr-2" />
-//             Filters ({Object.values(filters).filter(Boolean).length})
-//           </TabsTrigger>
-//           <TabsTrigger value="results">
-//             <Search className="w-4 h-4 mr-2" />
-//             Results ({results.length})
-//           </TabsTrigger>
-//         </TabsList>
-
-//         <TabsContent value="filters" className="space-y-4">
-//           {/* Quick Actions */}
-//           <Card>
-//             <CardContent className="pt-6">
-//               <div className="flex items-center justify-between">
-//                 <div className="flex gap-2">
-//                   <Button
-//                     onClick={runScreener}
-//                     disabled={loading}
-//                     data-testid="run-screener-btn"
-//                   >
-//                     <Search className="w-4 h-4 mr-2" />
-//                     {loading ? "Screening..." : "Run Screener"}
-//                   </Button>
-//                   <Button variant="outline" onClick={() => setFilters({})}>
-//                     Clear All
-//                   </Button>
-//                 </div>
-//                 <select
-//   value={selectedIndex}
-//   onChange={(e) => setSelectedIndex(e.target.value)}
-//   className="px-3 py-2 rounded-md border border-border bg-background"
-// >
-// <option value="ALL">All Stocks</option>
-
-//   <optgroup label="Indices">
-//     <option value="NIFTY50">Nifty 50</option>
-//     <option value="NIFTYNEXT50">Nifty Next 50</option>
-//     <option value="NIFTY200">Nifty 200</option>
-//     <option value="NIFTY500">Nifty 500</option>
-//     <option value="NIFTYTOTALMARKET">Nifty Total Market</option>
-//   </optgroup>
-
-//   <optgroup label="Sectors">
-//     <option value="NIFTY_IT">IT</option>
-//     <option value="NIFTY_BANK">Banking</option>
-//     <option value="NIFTY_AUTO">Auto</option>
-//     <option value="NIFTY_FMCG">FMCG</option>
-//     <option value="NIFTY_METAL">Metal</option>
-//   </optgroup>
-// </select>
-//               </div>
-//             </CardContent>
-//           </Card>
-
-//           {/* Filter Categories */}
-//           <Accordion type="multiple" className="space-y-2">
-//             {filterCategories.map((category) => {
-//               const Icon = category.icon;
-//               const categoryFilters = availableFilters[category.id] || [];
-//               const selectedCount = categoryFilters.filter(
-//                 (f) => filters[f.id]
-//               ).length;
-
-//               return (
-//                 <AccordionItem
-//                   key={category.id}
-//                   value={category.id}
-//                   className="border rounded-lg px-4"
-//                 >
-//                   <AccordionTrigger>
-//                     <div className="flex items-center gap-3">
-//                       <Icon className={`w-5 h-5 ${category.color}`} />
-//                       <span className="font-semibold">{category.name}</span>
-//                       {selectedCount > 0 && (
-//                         <span className="px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-//                           {selectedCount}
-//                         </span>
-//                       )}
-//                     </div>
-//                   </AccordionTrigger>
-//                   <AccordionContent>
-//                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-4">
-//                       {categoryFilters.map((filter) => (
-//                         <div
-//                           key={filter.id}
-//                           className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent transition-colors cursor-pointer"
-//                           onClick={() => toggleFilter(filter.id)}
-//                         >
-//                           <Checkbox
-//                             checked={filters[filter.id] || false}
-//                             onCheckedChange={() => toggleFilter(filter.id)}
-//                             data-testid={`filter-${filter.id}`}
-//                           />
-//                           <div className="flex-1">
-//                             <div className="font-medium text-sm">
-//                               {filter.name}
-//                             </div>
-//                             <div className="text-xs text-muted-foreground mt-0.5">
-//                               {filter.description}
-//                             </div>
-//                           </div>
-//                         </div>
-//                       ))}
-//                     </div>
-//                   </AccordionContent>
-//                 </AccordionItem>
-//               );
-//             })}
-//           </Accordion>
-//         </TabsContent>
-
-//         <TabsContent value="results" className="space-y-4">
-//           {filteredResults.length === 0 ? (
-//             <Card>
-//               <CardContent className="text-center py-12 text-muted-foreground">
-//                 No results yet. Select filters and click "Run Screener"
-//               </CardContent>
-//             </Card>
-//           ) : (
-//             <div className="space-y-3">
-//               <div className="w-full">
-//                 <input
-//                   type="text"
-//                   placeholder="Search by symbol or company name..."
-//                   value={searchTerm}
-//                   onChange={(e) => setSearchTerm(e.target.value)}
-//                   className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//                 />
-//               </div>
-//               {filteredResults.map((stock, idx) => (
-//                 <Link to ={`/charts/${stock.symbol}`}>
-//                 <Card key={idx} className="hover:shadow-md transition-shadow">
-//                   <CardContent className="pt-6">
-//                     <div className="flex items-center justify-between mb-3">
-//                       <div>
-//                         <div className="font-mono text-lg font-bold text-blue-500">
-//                           {stock.symbol}
-//                         </div>
-//                         <div className="text-sm text-muted-foreground">
-//                           {stock.name}
-//                         </div>
-//                       </div>
-//                       <div className="text-right">
-//                         <div className="text-xl font-bold">
-//                           ₹{stock.price.toFixed(2)}
-//                         </div>
-//                         <div className="text-sm text-muted-foreground">
-//                           Vol: {(stock.volume / 1000).toFixed(0)}K
-//                         </div>
-//                       </div>
-//                     </div>
-
-//                     <div className="flex flex-wrap gap-2 mb-3">
-//                       {stock.matched_filters.map((filter, i) => (
-//                         <span
-//                           key={i}
-//                           className="px-2.5 py-1 bg-blue-500/10 text-blue-500 text-xs font-medium rounded-md border border-blue-500/20"
-//                         >
-//                           {filter.replace("_", " ").toUpperCase()}
-//                         </span>
-//                       ))}
-//                     </div>
-
-//                     {Object.keys(stock.indicator_values).length > 0 && (
-//                       <div className="pt-3 border-t text-sm grid grid-cols-2 md:grid-cols-4 gap-2">
-//                         {Object.entries(stock.indicator_values).map(
-//                           ([key, value], i) => (
-//                             <div key={i}>
-//                               <span className="text-muted-foreground">
-//                                 {key}:{" "}
-//                               </span>
-//                               <span className="font-semibold">
-//                                 {typeof value === "number"
-//                                   ? value.toFixed(2)
-//                                   : value}
-//                               </span>
-//                             </div>
-//                           )
-//                         )}
-//                       </div>
-//                     )}
-//                   </CardContent>
-//                 </Card>
-//                 </Link>
-//               ))}
-//             </div>
-//           )}
-//         </TabsContent>
-//       </Tabs>
-//     </div>
-//   );
-// };
-
-// export default EnhancedScreener;
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Search, Filter, TrendingUp, Volume2, Activity, Zap, BarChart3, Target, PieChart, VolumeIcon, QrCodeIcon, Info, X ,BookOpen} from 'lucide-react';
+import { Search, Filter, TrendingUp, Activity, Zap, BarChart3, Target, QrCodeIcon, Info, X, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { Navigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { useMemo } from 'react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -567,6 +233,7 @@ const EnhancedScreener = () => {
   const [selectedIndex, setSelectedIndex] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState("");
   const [patternModal, setPatternModal] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(50);  // pagination window
 
   const filteredResults = useMemo(() => {
     return results.filter((stock) =>
@@ -574,6 +241,16 @@ const EnhancedScreener = () => {
       stock.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [results, searchTerm]);
+
+  // Only render the first `visibleCount` rows — keeps the DOM light when the
+  // screener returns 500+ matches. "Show more" reveals the rest in batches.
+  const visibleResults = useMemo(
+    () => filteredResults.slice(0, visibleCount),
+    [filteredResults, visibleCount]
+  );
+
+  // Reset pagination whenever the underlying result set changes
+  useEffect(() => { setVisibleCount(50); }, [results, searchTerm]);
 
   useEffect(() => {
     fetchStocks();
@@ -818,79 +495,40 @@ const EnhancedScreener = () => {
 
         <TabsContent value="results" className="space-y-4">
             <div className="space-y-3">
-              <div className="w-full">
+              <div className="w-full flex items-center justify-between gap-3">
                 <input
                   type="text"
                   placeholder="Search by symbol or company name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+                  className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
                 />
+                <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid="results-count">
+                  Showing {visibleResults.length} of {filteredResults.length}
+                </span>
               </div>
-              {filteredResults.map((stock, idx) => (
+              {visibleResults.map((stock, idx) => (
                 // <Link to={`/charts/${stock.symbol}`} key={idx}>
-                  <Card className="hover:shadow-md transition-shadow">
+                  <Card className="hover:shadow-md transition-shadow" key={idx}>
                     <CardContent className="pt-6">
-                    <div className="group relative flex items-center gap-4 px-4 py-3 rounded-xl
-     border border-border/40 bg-card/60 backdrop-blur-sm
-     hover:border-blue-500/30 hover:bg-blue-500/[0.03]
-     transition-all duration-200 cursor-pointer">
-
-  {/* Left: identity */}
-  <div className="flex-1 min-w-0">
-    <div className="flex items-center gap-2 mb-0.5">
-      <span className="font-mono text-sm font-bold text-blue-400 tracking-widest">
-        {stock.symbol}
-      </span>
-      {/* optional live dot */}
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-    </div>
-    <div className="text-xs text-muted-foreground truncate">{stock.name}</div>
-  </div>
-
-  {/* Center: price + volume */}
-  <div className="text-right shrink-0">
-    <div className="font-mono text-base font-bold tabular-nums">
-      ₹{stock.price.toFixed(2)}
-    </div>
-    <div className="text-[11px] text-muted-foreground tabular-nums">
-      {(stock.volume / 1000).toFixed(0)}Kvol
-    </div>
-  </div>
-
-  {/* Divider */}
-  <div className="w-px h-8 bg-border/50 shrink-0" />
-
-  {/* Right: actions */}
-  <div className="flex items-center gap-3 shrink-0">
-  <Link to={`/charts/${stock.symbol}`} key={idx}>
-    <button
-      className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg
-        border border-blue-500/20 bg-blue-500/10 text-blue-400
-        hover:bg-blue-500/20 hover:border-blue-500/40
-        transition-all duration-150 group/btn"
-    >
-      <BarChart3 className="w-3.5 h-3.5" />
-      <span className="text-[10px] font-semibold tracking-wide uppercase">Chart</span>
-    </button>
-    </Link>
-    <Link to={`/fundamentals/${stock.symbol}`} key={idx}>
-    <button
-      className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg
-        border border-red-500/50 bg-red-500/10 text-red-400
-        hover:bg-red-500/20 hover:border-red-500/40
-        transition-all duration-150"
-    >
-      <BookOpen className="w-3.5 h-3.5" />
-      <span className="text-[10px] font-semibold tracking-wide uppercase">Funds</span>
-    </button>
-    </Link>
-  </div>
-
-  {/* Hover accent line */}
-  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-0 rounded-full
-    bg-blue-500 group-hover:h-8 transition-all duration-200" />
-</div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-mono text-lg font-bold text-blue-500">
+                            {stock.symbol}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {stock.name}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold">
+                            ₹{stock.price.toFixed(2)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Vol: {(stock.volume / 1000).toFixed(0)}K
+                          </div>
+                        </div>
+                      </div>
 
                       <div className="flex flex-wrap gap-2 mb-3">
                         {stock.matched_filters.map((filter, i) => (
@@ -905,20 +543,37 @@ const EnhancedScreener = () => {
 
                       {Object.keys(stock.indicator_values).length > 0 && (
                         <div className="pt-3 border-t text-sm grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {Object.entries(stock.indicator_values).map(([key, value], i) => (
-                            <div key={i}>
-                              <span className="text-muted-foreground">{key}: </span>
-                              <span className="font-semibold">
-                                {typeof value === "number" ? value.toFixed(2) : value}
-                              </span>
-                            </div>
-                          ))}
+                          {Object.entries(stock.indicator_values).map(
+                            ([key, value], i) => (
+                              <div key={i}>
+                                <span className="text-muted-foreground">
+                                  {key}:{" "}
+                                </span>
+                                <span className="font-semibold">
+                                  {typeof value === "number"
+                                    ? value.toFixed(2)
+                                    : value}
+                                </span>
+                              </div>
+                            )
+                          )}
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 // </Link>
               ))}
+              {visibleCount < filteredResults.length && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setVisibleCount(v => v + 50)}
+                    data-testid="show-more-results-btn"
+                  >
+                    Show more ({filteredResults.length - visibleCount} remaining)
+                  </Button>
+                </div>
+              )}
             </div>
           
         </TabsContent>

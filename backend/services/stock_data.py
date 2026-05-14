@@ -64,6 +64,7 @@ from services.mongo_store import (
     get_last_stored_date,
 )
 from services.market_hours import needs_refresh, mark_symbol_fetched
+from database.collections import daily_prices
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,9 @@ INTRADAY_INTERVALS = {"1m", "2m", "3m", "5m", "15m", "30m", "1h"}
 
 # Max symbols per yfinance batch download (avoids rate-limit / timeout issues)
 DOWNLOAD_BATCH_SIZE = 50
+
+# Number of recent bars to keep per-symbol in memory (enough for 252-day filters)
+BULK_CACHE_LIMIT = 400
 
 
 # =============================================================================
@@ -101,9 +105,15 @@ class StockDataService:
     - search_stocks(query)             → fuzzy symbol/name search
     """
 
-    # In-memory cache keyed by symbol. Populated on startup and refreshed when
-    # data becomes stale. This avoids MongoDB round-trips on every screener call.
+    # Shared in-memory cache used by the screener. Populated on startup and
+    # when data becomes stale. This avoids MongoDB round-trips on every screener call.
     bulk_cache: Dict[str, pd.DataFrame] = {}
+
+    # Per-symbol pre-computed indicators (RSI, MACD, ADX, ATR, Bollinger).
+    # Keyed by symbol; each value is a dict with last_close_date fingerprint +
+    # indicator Series. Invalidated automatically when a new bar arrives.
+    # Avoids re-computing ~5 indicators × 750 symbols on every screener call.
+    indicator_cache: Dict[str, Dict[str, Any]] = {}
 
     # Supported index tickers (used by get_indices endpoint)
     INDICES = {
@@ -113,10 +123,129 @@ class StockDataService:
     }
 
     # Maps frontend timeframe string → yfinance interval string
-    TIMEFRAME_MAP = {
-        "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
+    supported_timeframes = {
+        "1m": "1m", "2m": "2m", "5m": "5m", "15m": "15m", "30m": "30m", 
         "1h": "1h", "1d": "1d", "1wk": "1wk", "1mo": "1mo",
     }
+
+    # =========================================================================
+    # PUBLIC: One-shot bulk load from MongoDB (used at startup)
+    # =========================================================================
+
+    @staticmethod
+    def bulk_load_from_mongo(symbols: list) -> int:
+        """
+        Single aggregation query that pulls the most recent BULK_CACHE_LIMIT
+        bars for *all* `symbols` and populates bulk_cache in memory.
+
+        Replaces the previous loop that issued one find() per symbol —
+        on Atlas free tier that loop alone took 30–60s for ~750 symbols.
+
+        Returns the number of symbols loaded.
+        """
+        if not symbols:
+            return 0
+
+        try:
+            pipeline = [
+                {"$match": {"symbol": {"$in": symbols}}},
+                {"$sort":  {"symbol": 1, "date": -1}},
+                {"$group": {
+                    "_id":  "$symbol",
+                    "rows": {"$push": {
+                        "Date":   "$date",
+                        "Open":   "$open",
+                        "High":   "$high",
+                        "Low":    "$low",
+                        "Close":  "$close",
+                        "Volume": "$volume",
+                    }},
+                }},
+                {"$project": {
+                    "_id":  1,
+                    "rows": {"$slice": ["$rows", BULK_CACHE_LIMIT]},
+                }},
+            ]
+
+            loaded = 0
+            for doc in daily_prices.aggregate(pipeline, allowDiskUse=True):
+                symbol = doc["_id"]
+                rows = doc["rows"]
+                if not rows:
+                    continue
+                df = pd.DataFrame(rows)
+                # rows are descending; reverse to ascending for indicators
+                df = df.iloc[::-1].reset_index(drop=True)
+                df["Date"] = pd.to_datetime(df["Date"])
+                StockDataService.bulk_cache[symbol] = df
+                loaded += 1
+
+            logger.info(
+                f"[StockDataService] bulk_load_from_mongo: loaded {loaded} "
+                f"symbols via one aggregation"
+            )
+            return loaded
+        except Exception as e:
+            logger.error(f"[StockDataService] bulk_load_from_mongo failed: {e}")
+            return 0
+
+    # =========================================================================
+    # PUBLIC: Indicator cache (used by the screener)
+    # =========================================================================
+
+    @staticmethod
+    def get_cached_indicators(symbol: str):
+        """
+        Return pre-computed RSI / MACD / ADX / ATR / Bollinger for `symbol`.
+
+        Computes on first access, then re-uses across every screener filter
+        call. Invalidates when the last bar in bulk_cache changes (i.e. a new
+        daily bar has arrived).
+        """
+        df = StockDataService.bulk_cache.get(symbol)
+        if df is None or df.empty:
+            return None
+
+        # Fingerprint = last bar's date — cheap, monotonic
+        try:
+            fp = df["Date"].iloc[-1]
+        except Exception:
+            fp = len(df)
+
+        cached = StockDataService.indicator_cache.get(symbol)
+        if cached and cached.get("fp") == fp:
+            return cached["indicators"]
+
+        # Lazy import to avoid circular dependency
+        from services.indicators import IndicatorService
+        ind = IndicatorService()
+        indicators = {
+            "rsi":       ind.calculate_rsi(df),
+            "macd":      ind.calculate_macd(df),
+            "adx":       ind.calculate_adx(df),
+            "atr":       ind.calculate_atr(df),
+            "bollinger": ind.calculate_bollinger(df),
+        }
+        StockDataService.indicator_cache[symbol] = {"fp": fp, "indicators": indicators}
+        return indicators
+
+    # =========================================================================
+    # PUBLIC: Bulk cache population (used by screener + startup loader)
+    # =========================================================================
+
+    @staticmethod
+    def has_stale_symbols(symbols: list) -> bool:
+        """
+        Cheap fast-path check: returns True if at least one symbol in `symbols`
+        either has no MongoDB record or is past its staleness window.
+        Lets the screener skip spawning a refresh thread on every request.
+        """
+        for s in symbols:
+            if s not in StockDataService.bulk_cache:
+                return True
+            if needs_refresh(s):
+                return True
+        return False
 
     # =========================================================================
     # PUBLIC: Bulk cache population (used by screener + startup loader)
@@ -141,22 +270,15 @@ class StockDataService:
             symbols that have gone stale since the last call)
         """
         try:
-            # Ensure all symbols are present in cache. We don't clear the whole
-            # cache anymore — just add missing ones and refresh stale ones.
-            # This makes the screener much faster when switching between indices.
-
-            # Step 1 — Load recent history from MongoDB
-            # Limit to 500 bars for screener indicators (RSI, MA, etc.)
-            for symbol in symbols:
-                if symbol not in StockDataService.bulk_cache:
-                    df = load_daily_prices(symbol, limit=500)
-                    if not df.empty:
-                        StockDataService.bulk_cache[symbol] = df
+            # Step 1 — Bulk-load any symbols missing from in-memory cache
+            # using a SINGLE aggregation query (was 750 separate find() calls).
+            missing_from_cache = [s for s in symbols if s not in StockDataService.bulk_cache]
+            if missing_from_cache:
+                StockDataService.bulk_load_from_mongo(missing_from_cache)
 
             # Step 2 — Identify symbols that need a fresh yfinance call
             to_download = [
-                s for s in symbols
-                if needs_refresh(s) or not symbol_has_data(s)
+                s for s in symbols if needs_refresh(s)
             ]
 
             if not to_download:
@@ -288,9 +410,26 @@ class StockDataService:
                     # Stamp this symbol as freshly fetched (resets staleness timer)
                     mark_symbol_fetched(symbol)
 
-                    # Reload the recent history from MongoDB into bulk_cache so
-                    # the cache stays lean for the screener.
-                    StockDataService.bulk_cache[symbol] = load_daily_prices(symbol, limit=500)
+                    # Update in-memory cache directly with the freshly fetched
+                    # DataFrame — previously we did another Mongo round-trip
+                    # here via load_daily_prices(), which was redundant and
+                    # slow on Atlas free tier.
+                    existing = StockDataService.bulk_cache.get(symbol)
+                    if existing is not None and not existing.empty:
+                        # Append new bars, drop dups on Date, keep tail
+                        merged = pd.concat([existing, df], ignore_index=True)
+                        merged.drop_duplicates(subset=["Date"], keep="last", inplace=True)
+                        merged.sort_values("Date", inplace=True)
+                        StockDataService.bulk_cache[symbol] = (
+                            merged.tail(BULK_CACHE_LIMIT).reset_index(drop=True)
+                        )
+                    else:
+                        StockDataService.bulk_cache[symbol] = (
+                            df.tail(BULK_CACHE_LIMIT).reset_index(drop=True)
+                        )
+
+                    # Invalidate cached indicators — they'll be recomputed lazily
+                    StockDataService.indicator_cache.pop(symbol, None)
 
                 except Exception as e:
                     logger.error(f"[StockDataService] Error processing {symbol}: {str(e)}")
